@@ -1,98 +1,98 @@
 import streamlit as st
 from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
 import PyPDF2
-import speech_recognition as sr
 import tempfile
 import os
+import streamlit_authenticator as stauth
+import yaml
+from yaml.loader import SafeLoader
+from googletrans import Translator
 
-# Title
-st.title("📚 AI Study Assistant (with Voice Input, Summary, Questions & MCQs)")
+# Load login config from YAML
+with open("config.yaml") as file:
+    config = yaml.load(file, Loader=SafeLoader)
 
-# Load Hugging Face models
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-base")
-model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-base")
+authenticator = stauth.Authenticate(
+    config['credentials'],
+    config['cookie']['name'],
+    config['cookie']['key'],
+    config['cookie']['expiry_days']
+)
 
-# PDF reading function
-def read_pdf(file):
-    reader = PyPDF2.PdfReader(file)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text()
-    return text
+name, authentication_status, username = authenticator.login("Login", "main")
 
-# Speech to text
-def convert_audio_to_text(audio_file):
-    recognizer = sr.Recognizer()
-    with sr.AudioFile(audio_file) as source:
-        audio_data = recognizer.record(source)
-        text = recognizer.recognize_google(audio_data)
-    return text
+if authentication_status:
+    authenticator.logout("Logout", "sidebar")
+    st.sidebar.success(f"Welcome {name}!")
+    
+    st.title("📚 AI Study Assistant (Login, Flashcards, Multilingual, Export)")
 
-# Inputs
-uploaded_file = st.file_uploader("📄 Upload PDF Notes", type="pdf")
-audio_file = st.file_uploader("🎤 Upload voice note (WAV only)", type=["wav"])
-text_input = st.text_area("✍️ Or paste your notes here")
+    summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+    tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-base")
+    model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-base")
+    translator = Translator()
 
-# Final content source
-final_text = ""
-if uploaded_file is not None:
-    final_text = read_pdf(uploaded_file)
-    st.success("✅ PDF uploaded successfully!")
-elif audio_file is not None:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_audio:
-        tmp_audio.write(audio_file.read())
-        final_text = convert_audio_to_text(tmp_audio.name)
-        os.remove(tmp_audio.name)
-        st.success("✅ Voice note converted to text!")
-elif text_input:
-    final_text = text_input
+    def read_pdf(file):
+        reader = PyPDF2.PdfReader(file)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text()
+        return text
 
-# Main logic
-if st.button("🤖 Generate Summary, Questions & MCQs"):
-    if final_text.strip():
-        with st.spinner("Generating Detailed Summary..."):
-            input_chunk = final_text[:2048]  # Allow longer text input
+    uploaded_file = st.file_uploader("📄 Upload PDF Notes", type="pdf")
+    text_input = st.text_area("✍️ Or paste your notes here")
+    target_lang = st.selectbox("🌍 Translate output to:", ["None", "hi", "bn", "ta", "te", "gu"], index=0)
+
+    final_text = ""
+    if uploaded_file is not None:
+        final_text = read_pdf(uploaded_file)
+        st.success("✅ PDF uploaded successfully!")
+    elif text_input:
+        final_text = text_input
+
+    if st.button("🤖 Generate Summary, Questions, MCQs, Flashcards"):
+        if final_text.strip():
+            input_chunk = final_text[:2048]
             summary_parts = summarizer(input_chunk, max_length=300, min_length=80, do_sample=False)
             full_summary = " ".join([part['summary_text'] for part in summary_parts])
+            if target_lang != "None":
+                full_summary = translator.translate(full_summary, dest=target_lang).text
             st.subheader("📝 Summary")
             st.write(full_summary)
 
-        with st.spinner("Generating Important Questions..."):
-            prompt_q = f"""
-Generate as many important short-answer or descriptive questions as possible from the following content.
-Questions should cover all aspects and topics discussed.
-
-Text:
-{input_chunk}
-"""
+            prompt_q = f"Generate all important short and descriptive questions based on:\n{input_chunk}"
             inputs_q = tokenizer(prompt_q, return_tensors="pt", max_length=1024, truncation=True)
             output_q = model.generate(**inputs_q, max_length=1024, num_beams=4, early_stopping=True)
             questions = tokenizer.decode(output_q[0], skip_special_tokens=True)
+            if target_lang != "None":
+                questions = translator.translate(questions, dest=target_lang).text
             st.subheader("❓ Important Questions")
             st.markdown("```text\n" + questions + "\n```")
 
-        with st.spinner("Generating MCQs..."):
-            prompt = f"""
-You are a helpful education assistant. Based on the following passage, generate as many high-quality multiple choice questions (MCQs) as possible.
-
-Each question must:
-- Be based on the passage
-- Have 4 options labeled A, B, C, D
-- Include a final line like: "Answer: B"
-
-Here is the passage:
-{input_chunk}
-"""
-            inputs = tokenizer(prompt, return_tensors="pt", max_length=1024, truncation=True)
-            output = model.generate(
-                **inputs,
-                max_length=1024,
-                num_beams=4,
-                early_stopping=True
-            )
+            prompt_mcq = f"Generate multiple MCQs with 4 options and correct answers from:\n{input_chunk}"
+            inputs = tokenizer(prompt_mcq, return_tensors="pt", max_length=1024, truncation=True)
+            output = model.generate(**inputs, max_length=1024, num_beams=4, early_stopping=True)
             mcqs = tokenizer.decode(output[0], skip_special_tokens=True)
+            if target_lang != "None":
+                mcqs = translator.translate(mcqs, dest=target_lang).text
             st.subheader("🧠 MCQs")
             st.markdown("```text\n" + mcqs + "\n```")
-    else:
-        st.warning("Please upload a PDF, voice note, or paste your notes.")
+
+            flashcard_prompt = f"Generate flashcards (Q&A pairs) for revision from:\n{input_chunk}"
+            inputs_f = tokenizer(flashcard_prompt, return_tensors="pt", max_length=1024, truncation=True)
+            output_f = model.generate(**inputs_f, max_length=1024, num_beams=4, early_stopping=True)
+            flashcards = tokenizer.decode(output_f[0], skip_special_tokens=True)
+            if target_lang != "None":
+                flashcards = translator.translate(flashcards, dest=target_lang).text
+            st.subheader("📇 Flashcards")
+            st.markdown("```text\n" + flashcards + "\n```")
+
+            st.download_button("📥 Export All as TXT", data=full_summary + "\n\n" + questions + "\n\n" + mcqs + "\n\n" + flashcards, file_name="study_output.txt")
+
+        else:
+            st.warning("Please upload a PDF or paste your notes.")
+
+elif authentication_status is False:
+    st.error("❌ Incorrect username or password")
+elif authentication_status is None:
+    st.warning("⚠️ Please enter your login credentials")
