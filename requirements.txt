@@ -1,9 +1,9 @@
 streamlit
 transformers
 torch
-sentencepiece
-PyPDF2
-SpeechRecognition
+pydub
+speechrecognition
+fpdf
 python-docx
-reportlab
+
 
