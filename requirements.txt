@@ -1,7 +1,7 @@
 streamlit
 transformers
 PyPDF2
-googletrans==4.0.0-rc1
 SpeechRecognition
+googletrans==4.0.0-rc1
 python-docx
 reportlab
