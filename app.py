@@ -35,15 +35,6 @@ elif text_input:
 if st.button("🤖 Generate Summary, Questions & MCQs"):
     if final_text.strip():
         with st.spinner("Generating Summary..."):
-            input_chunk = final_text[:1024]  # Limit for BART model
-            summary = summarizer(input_chunk, max_length=150, min_length=30, do_sample=False)[0]['summary_text']
-            st.subheader("📝 Summary")
-            st.write(summary)
-
-        st.subheader("❓ 5 Important Questions")
-        st.write("""if st.button("🤖 Generate Summary, Questions & MCQs"):
-    if final_text.strip():
-        with st.spinner("Generating Summary..."):
             input_chunk = final_text[:1024]
             summary = summarizer(input_chunk, max_length=150, min_length=30, do_sample=False)[0]['summary_text']
             st.subheader("📝 Summary")
