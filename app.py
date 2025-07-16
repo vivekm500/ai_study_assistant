@@ -6,16 +6,24 @@ import tempfile
 import os
 from docx import Document
 from reportlab.pdfgen import canvas
+import torch
+import textwrap
 
-# Streamlit config
+# Page config
 st.set_page_config(page_title="AI Study Assistant", layout="centered")
 
 # Load models
+st.spinner("Loading models...")
 summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-base")
-model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-base")
+tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-large")
+model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-large")
 
-# Language translation map
+def generate_text(prompt, max_len=1024):
+    inputs = tokenizer(prompt, return_tensors="pt", truncation=True)
+    outputs = model.generate(**inputs, max_length=max_len, num_beams=4)
+    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+# Translation support
 lang_map = {
     "hi": "Helsinki-NLP/opus-mt-en-hi",
     "bn": "Helsinki-NLP/opus-mt-en-bn",
@@ -24,32 +32,30 @@ lang_map = {
     "gu": "Helsinki-NLP/opus-mt-en-gu"
 }
 
-def translate(text, target_lang):
-    if target_lang == "None" or target_lang not in lang_map:
+def translate(text, lang):
+    if lang == "None" or lang not in lang_map:
         return text
-    model_name = lang_map[target_lang]
+    model_name = lang_map[lang]
     tokenizer_mt = MarianTokenizer.from_pretrained(model_name)
     model_mt = MarianMTModel.from_pretrained(model_name)
     inputs = tokenizer_mt(text, return_tensors="pt", truncation=True, padding=True)
     translated = model_mt.generate(**inputs)
     return tokenizer_mt.decode(translated[0], skip_special_tokens=True)
 
-# Read PDF
+# File reading
+
 def read_pdf(file):
     reader = PyPDF2.PdfReader(file)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text()
-    return text
+    return "\n".join([page.extract_text() for page in reader.pages])
 
-# Voice to text
 def convert_audio_to_text(audio_file):
     recognizer = sr.Recognizer()
     with sr.AudioFile(audio_file) as source:
         audio_data = recognizer.record(source)
         return recognizer.recognize_google(audio_data)
 
-# Export to PDF
+# Export utilities
+
 def export_to_pdf(content, filename):
     path = f"{filename}.pdf"
     c = canvas.Canvas(path)
@@ -60,95 +66,72 @@ def export_to_pdf(content, filename):
     c.save()
     return path
 
-# Export to DOCX
 def export_to_docx(content, filename):
     doc = Document()
-    doc.add_paragraph(content)
+    for line in content.split('\n'):
+        doc.add_paragraph(line)
     path = f"{filename}.docx"
     doc.save(path)
     return path
 
-# UI Header
-st.title("📚 AI Study Assistant (All-In-One Generator)")
+# UI
+st.title("📚 AI Study Assistant - flan-t5-large powered")
+uploaded_pdf = st.file_uploader("📄 Upload PDF", type="pdf")
+audio_file = st.file_uploader("🎤 Upload Voice Note (WAV)", type="wav")
+text_input = st.text_area("✍️ Or Paste Your Notes Here")
+lang = st.selectbox("🌍 Translate Output To", ["None", "hi", "bn", "ta", "te", "gu"])
 
-# Input methods
-with st.expander("📤 Upload or Paste Notes"):
-    uploaded_pdf = st.file_uploader("📄 Upload PDF Notes", type="pdf")
-    audio_file = st.file_uploader("🎤 Upload WAV voice note", type=["wav"])
-    text_input = st.text_area("✍️ Or paste your notes here")
-    lang = st.selectbox("🌍 Translate output to:", ["None", "hi", "bn", "ta", "te", "gu"], index=0)
-
-# Get input
 input_text = ""
 if uploaded_pdf:
     input_text = read_pdf(uploaded_pdf)
-    st.success("✅ PDF uploaded.")
 elif audio_file:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
         tmp.write(audio_file.read())
         input_text = convert_audio_to_text(tmp.name)
         os.remove(tmp.name)
-        st.success("✅ Audio transcribed.")
 elif text_input:
     input_text = text_input
 
-# Process button
-if st.button("🚀 Generate Summary, Questions, MCQs, Flashcards"):
-    if not input_text.strip():
-        st.warning("⚠️ Please provide some notes.")
-    else:
-        chunk = input_text[:2048]
+if st.button("🚀 Generate Study Material") and input_text.strip():
+    text_chunks = textwrap.wrap(input_text, 1000)
+    full_summary, full_questions, full_mcqs, full_flashcards = [], [], [], []
 
+    for chunk in text_chunks:
         # Summary
-        summary = summarizer(chunk, max_length=512, min_length=150, do_sample=False)[0]["summary_text"]
-        summary = translate(summary, lang)
-        st.subheader("📝 Summary")
-        st.write(summary)
+        summary = summarizer(chunk, max_length=512, min_length=150, do_sample=False)[0]['summary_text']
+        full_summary.append(summary)
 
         # Important Questions
         q_prompt = f"""
-Extract all important and meaningful descriptive questions from the text below.
-Avoid duplicates and keep each question well-phrased.
-
+Extract all meaningful descriptive and conceptual questions from this academic text. Avoid duplicates.
 Text:
 {chunk}
 """
-        inputs_q = tokenizer(q_prompt, return_tensors="pt", truncation=True)
-        output_q = model.generate(**inputs_q, max_length=1024, num_beams=4)
-        questions = tokenizer.decode(output_q[0], skip_special_tokens=True)
-        questions = translate(questions, lang)
-        st.subheader("❓ Important Questions")
-        st.text(questions)
+        questions = generate_text(q_prompt)
+        full_questions.append(questions)
 
         # MCQs
         mcq_prompt = f"""
-Generate all possible meaningful multiple-choice questions (MCQs) from the following academic notes.
-Each MCQ must be well-structured, unique, and follow this format:
+Generate all possible multiple-choice questions from this academic text. Each MCQ must have this format:
 
 Question: ...
 Options:
-A. Option A
-B. Option B
-C. Option C
-D. Option D
+A. ...
+B. ...
+C. ...
+D. ...
 Answer: B
 
-Avoid repeating questions or options.
-
+Avoid repeated questions or repeated options.
 Text:
 {chunk}
 """
-        inputs_m = tokenizer(mcq_prompt, return_tensors="pt", truncation=True)
-        output_m = model.generate(**inputs_m, max_length=1024, num_beams=4)
-        mcqs = tokenizer.decode(output_m[0], skip_special_tokens=True)
-        mcqs = translate(mcqs, lang)
-        st.subheader("🧠 MCQs")
-        st.text(mcqs)
+        mcqs = generate_text(mcq_prompt)
+        full_mcqs.append(mcqs)
 
         # Flashcards
         fc_prompt = f"""
-Create as many flashcards as possible from the following text in the format below.
-Each flashcard must be unique and non-repetitive.
+Create all possible non-repetitive flashcards from the text. Format:
 
 Question: ...
 Answer: ...
@@ -156,22 +139,27 @@ Answer: ...
 Text:
 {chunk}
 """
-        inputs_f = tokenizer(fc_prompt, return_tensors="pt", truncation=True)
-        output_f = model.generate(**inputs_f, max_length=1024, num_beams=4)
-        flashcards = tokenizer.decode(output_f[0], skip_special_tokens=True)
-        flashcards = translate(flashcards, lang)
-        st.subheader("📇 Flashcards")
-        st.text(flashcards)
+        flashcards = generate_text(fc_prompt)
+        full_flashcards.append(flashcards)
 
-        # Output combined
-        full_output = f"""📝 Summary:\n{summary}\n\n❓ Important Questions:\n{questions}\n\n🧠 MCQs:\n{mcqs}\n\n📇 Flashcards:\n{flashcards}"""
+    # Combine + Translate
+    combined = {
+        "📝 Summary": "\n".join(full_summary),
+        "❓ Important Questions": "\n".join(full_questions),
+        "🧠 MCQs": "\n".join(full_mcqs),
+        "📇 Flashcards": "\n".join(full_flashcards)
+    }
 
-        st.download_button("📥 Export as TXT", full_output, file_name="study_output.txt")
+    final_output = "\n\n".join([f"{key}\n{translate(value, lang)}" for key, value in combined.items()])
 
-        pdf_path = export_to_pdf(full_output, "study_output")
-        with open(pdf_path, "rb") as f:
-            st.download_button("📄 Export as PDF", f, file_name="study_output.pdf")
+    # Display
+    for section, text in combined.items():
+        st.subheader(section)
+        st.text(translate(text, lang))
 
-        docx_path = export_to_docx(full_output, "study_output")
-        with open(docx_path, "rb") as f:
-            st.download_button("📝 Export as DOCX", f, file_name="study_output.docx")
+    # Export
+    st.download_button("📥 Download as TXT", final_output, file_name="study_material.txt")
+    with open(export_to_pdf(final_output, "study_material"), "rb") as f:
+        st.download_button("📄 Download PDF", f, file_name="study_material.pdf")
+    with open(export_to_docx(final_output, "study_material"), "rb") as f:
+        st.download_button("📝 Download DOCX", f, file_name="study_material.docx")
