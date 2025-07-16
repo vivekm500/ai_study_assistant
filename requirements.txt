@@ -2,6 +2,6 @@ streamlit
 transformers
 PyPDF2
 googletrans==4.0.0-rc1
-streamlit-authenticator
-PyYAML
 SpeechRecognition
+python-docx
+reportlab
