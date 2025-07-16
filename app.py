@@ -41,6 +41,15 @@ if st.button("🤖 Generate Summary, Questions & MCQs"):
             st.write(summary)
 
         st.subheader("❓ 5 Important Questions")
+        st.write("""if st.button("🤖 Generate Summary, Questions & MCQs"):
+    if final_text.strip():
+        with st.spinner("Generating Summary..."):
+            input_chunk = final_text[:1024]
+            summary = summarizer(input_chunk, max_length=150, min_length=30, do_sample=False)[0]['summary_text']
+            st.subheader("📝 Summary")
+            st.write(summary)
+
+        st.subheader("❓ 5 Important Questions")
         st.write("""
         1. What is the main idea of the topic?
         2. Explain the key concepts mentioned.
@@ -49,29 +58,30 @@ if st.button("🤖 Generate Summary, Questions & MCQs"):
         5. What are the challenges or limitations of this topic?
         """)
 
-           with st.spinner("Generating MCQs..."):
-        prompt = f"""
-        Generate 5 multiple choice questions (MCQs) from the following text.
-        Each question must include:
-        - A question
-        - 4 options labeled A, B, C, D
-        - One correct answer labeled like: Answer: A or Answer: B
+        with st.spinner("Generating MCQs..."):
+            prompt = f"""
+            Generate 5 multiple choice questions (MCQs) from the following text.
+            Each question must include:
+            - A question
+            - 4 options labeled A, B, C, D
+            - One correct answer labeled like: Answer: A or Answer: B
 
-        Text: {input_chunk}
-        """
-        inputs = tokenizer(prompt, return_tensors="pt", max_length=1024, truncation=True)
-        output = model.generate(
-            **inputs,
-            max_length=800,
-            num_beams=4,
-            early_stopping=True
-        )
-        mcqs = tokenizer.decode(output[0], skip_special_tokens=True)
+            Text: {input_chunk}
+            """
+            inputs = tokenizer(prompt, return_tensors="pt", max_length=1024, truncation=True)
+            output = model.generate(
+                **inputs,
+                max_length=800,
+                num_beams=4,
+                early_stopping=True
+            )
+            mcqs = tokenizer.decode(output[0], skip_special_tokens=True)
 
-        st.subheader("🧠 MCQs")
-        st.text(mcqs)
-
-
-
+            st.subheader("🧠 MCQs")
+            st.text(mcqs)
     else:
         st.warning("Please upload a PDF or paste your notes.")
+
+        
+
+           
