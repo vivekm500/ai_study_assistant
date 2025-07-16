@@ -3,7 +3,7 @@ from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
 import PyPDF2
 
 # Title
-st.title("📚 AI Study Assistant (Free with Summary, Questions, MCQs)")
+st.title("📚 AI Study Assistant (Geberate Summary, Questions, MCQs)")
 
 # Load Hugging Face models
 summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
