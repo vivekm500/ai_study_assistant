@@ -50,12 +50,26 @@ if st.button("🤖 Generate Summary, Questions & MCQs"):
         """)
 
         with st.spinner("Generating MCQs..."):
-            prompt = f"Generate 3 multiple choice questions with 4 options and answers based on the following:\n{input_chunk}"
-            inputs = tokenizer(prompt, return_tensors="pt", max_length=1024, truncation=True)
-            output = model.generate(**inputs, max_length=512)
-            mcqs = tokenizer.decode(output[0], skip_special_tokens=True)
+    prompt = f"""
+Generate 5 multiple choice questions (MCQs) from the following text.
+Each question must include:
+- A question
+- 4 options labeled A, B, C, D
+- One correct answer labeled like: Answer: A or Answer: B
 
-        st.subheader("🧠 MCQs")
-        st.write(mcqs)
+Text: {input_chunk}
+"""
+    inputs = tokenizer(prompt, return_tensors="pt", max_length=1024, truncation=True)
+    output = model.generate(
+        **inputs,
+        max_length=800,         # Increased output length
+        num_beams=4,            # Better quality
+        early_stopping=True
+    )
+    mcqs = tokenizer.decode(output[0], skip_special_tokens=True)
+
+st.subheader("🧠 MCQs")
+st.text(mcqs)
+
     else:
         st.warning("Please upload a PDF or paste your notes.")
