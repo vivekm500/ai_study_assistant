@@ -7,7 +7,7 @@ import os
 from docx import Document
 from reportlab.pdfgen import canvas
 
-# App Config
+# Streamlit config
 st.set_page_config(page_title="AI Study Assistant", layout="centered")
 
 # Load models
@@ -15,7 +15,7 @@ summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-base")
 model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-base")
 
-# Language map for translation (optional)
+# Language translation map
 lang_map = {
     "hi": "Helsinki-NLP/opus-mt-en-hi",
     "bn": "Helsinki-NLP/opus-mt-en-bn",
@@ -34,7 +34,7 @@ def translate(text, target_lang):
     translated = model_mt.generate(**inputs)
     return tokenizer_mt.decode(translated[0], skip_special_tokens=True)
 
-# PDF reader
+# Read PDF
 def read_pdf(file):
     reader = PyPDF2.PdfReader(file)
     text = ""
@@ -42,7 +42,7 @@ def read_pdf(file):
         text += page.extract_text()
     return text
 
-# Voice-to-text
+# Voice to text
 def convert_audio_to_text(audio_file):
     recognizer = sr.Recognizer()
     with sr.AudioFile(audio_file) as source:
@@ -68,17 +68,17 @@ def export_to_docx(content, filename):
     doc.save(path)
     return path
 
-# Title
-st.title("📚 AI Study Assistant (Offline + Multilingual)")
+# UI Header
+st.title("📚 AI Study Assistant (All-In-One Generator)")
 
-# Inputs
+# Input methods
 with st.expander("📤 Upload or Paste Notes"):
     uploaded_pdf = st.file_uploader("📄 Upload PDF Notes", type="pdf")
     audio_file = st.file_uploader("🎤 Upload WAV voice note", type=["wav"])
     text_input = st.text_area("✍️ Or paste your notes here")
     lang = st.selectbox("🌍 Translate output to:", ["None", "hi", "bn", "ta", "te", "gu"], index=0)
 
-# Extract Input
+# Get input
 input_text = ""
 if uploaded_pdf:
     input_text = read_pdf(uploaded_pdf)
@@ -92,10 +92,10 @@ elif audio_file:
 elif text_input:
     input_text = text_input
 
-# Process Button
-if st.button("🤖 Generate Study Materials"):
+# Process button
+if st.button("🚀 Generate Summary, Questions, MCQs, Flashcards"):
     if not input_text.strip():
-        st.warning("⚠️ Please provide notes first.")
+        st.warning("⚠️ Please provide some notes.")
     else:
         chunk = input_text[:2048]
 
@@ -105,11 +105,12 @@ if st.button("🤖 Generate Study Materials"):
         st.subheader("📝 Summary")
         st.write(summary)
 
-        # Questions
+        # Important Questions
         q_prompt = f"""
-Extract all meaningful and non-repetitive descriptive and conceptual questions from the following academic notes.
+Extract all important and meaningful descriptive questions from the text below.
+Avoid duplicates and keep each question well-phrased.
 
-Notes:
+Text:
 {chunk}
 """
         inputs_q = tokenizer(q_prompt, return_tensors="pt", truncation=True)
@@ -121,17 +122,18 @@ Notes:
 
         # MCQs
         mcq_prompt = f"""
-Generate as many unique multiple-choice questions (MCQs) as possible from the given notes.
-Each MCQ should follow this format:
+Generate all possible meaningful multiple-choice questions (MCQs) from the following academic notes.
+Each MCQ must be well-structured, unique, and follow this format:
+
 Question: ...
 Options:
-A. ...
-B. ...
-C. ...
-D. ...
-Answer: <A/B/C/D>
+A. Option A
+B. Option B
+C. Option C
+D. Option D
+Answer: B
 
-Avoid repeating content.
+Avoid repeating questions or options.
 
 Text:
 {chunk}
@@ -140,13 +142,14 @@ Text:
         output_m = model.generate(**inputs_m, max_length=1024, num_beams=4)
         mcqs = tokenizer.decode(output_m[0], skip_special_tokens=True)
         mcqs = translate(mcqs, lang)
-        st.subheader("🧠 Multiple Choice Questions (MCQs)")
+        st.subheader("🧠 MCQs")
         st.text(mcqs)
 
         # Flashcards
         fc_prompt = f"""
-Create multiple non-repetitive flashcards from the following academic text.
-Each flashcard should be in this format:
+Create as many flashcards as possible from the following text in the format below.
+Each flashcard must be unique and non-repetitive.
+
 Question: ...
 Answer: ...
 
@@ -160,15 +163,15 @@ Text:
         st.subheader("📇 Flashcards")
         st.text(flashcards)
 
-        # Combine for export
-        full_content = f"""📝 Summary:\n{summary}\n\n❓ Questions:\n{questions}\n\n🧠 MCQs:\n{mcqs}\n\n📇 Flashcards:\n{flashcards}"""
+        # Output combined
+        full_output = f"""📝 Summary:\n{summary}\n\n❓ Important Questions:\n{questions}\n\n🧠 MCQs:\n{mcqs}\n\n📇 Flashcards:\n{flashcards}"""
 
-        st.download_button("📥 Export as TXT", full_content, file_name="study_output.txt")
+        st.download_button("📥 Export as TXT", full_output, file_name="study_output.txt")
 
-        pdf_path = export_to_pdf(full_content, "study_output")
+        pdf_path = export_to_pdf(full_output, "study_output")
         with open(pdf_path, "rb") as f:
             st.download_button("📄 Export as PDF", f, file_name="study_output.pdf")
 
-        docx_path = export_to_docx(full_content, "study_output")
+        docx_path = export_to_docx(full_output, "study_output")
         with open(docx_path, "rb") as f:
             st.download_button("📝 Export as DOCX", f, file_name="study_output.docx")
