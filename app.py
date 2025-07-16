@@ -49,7 +49,7 @@ if st.button("🤖 Generate Summary, Questions & MCQs"):
         5. What are the challenges or limitations of this topic?
         """)
 
-        with st.spinner("Generating MCQs..."):
+       with st.spinner("Generating MCQs..."):
     prompt = f"""
 Generate 5 multiple choice questions (MCQs) from the following text.
 Each question must include:
@@ -62,14 +62,15 @@ Text: {input_chunk}
     inputs = tokenizer(prompt, return_tensors="pt", max_length=1024, truncation=True)
     output = model.generate(
         **inputs,
-        max_length=800,         # Increased output length
-        num_beams=4,            # Better quality
+        max_length=800,
+        num_beams=4,
         early_stopping=True
     )
     mcqs = tokenizer.decode(output[0], skip_special_tokens=True)
 
 st.subheader("🧠 MCQs")
 st.text(mcqs)
+
 
     else:
         st.warning("Please upload a PDF or paste your notes.")
