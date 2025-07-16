@@ -81,7 +81,3 @@ if st.button("🤖 Generate Summary, Questions & MCQs"):
             st.text(mcqs)
     else:
         st.warning("Please upload a PDF or paste your notes.")
-
-        
-
-           
