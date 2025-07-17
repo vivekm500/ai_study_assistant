@@ -6,4 +6,4 @@ PyPDF2
 SpeechRecognition
 python-docx
 reportlab
-
+numpy<2
