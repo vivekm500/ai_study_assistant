@@ -7,7 +7,6 @@ from io import BytesIO
 summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 
 st.set_page_config(page_title="AI Study Assistant", layout="wide")
-
 st.title("📚 AI Study Assistant (Generate Summary, Questions, MCQs)")
 
 # File Upload or Text Input
@@ -25,7 +24,11 @@ def extract_text_from_pdf(file):
         text += page.extract_text() + "\n"
     return text.strip()
 
-# Generate 5 Important Questions
+# Helper: Split text into chunks under 1024 tokens (~1200-1500 chars)
+def split_text_into_chunks(text, max_chunk_length=1500):
+    return [text[i:i + max_chunk_length] for i in range(0, len(text), max_chunk_length)]
+
+# Generate 5 Important Questions (You can replace with AI later)
 def generate_questions(text):
     return [
         "1. What type of programming language is Python and what are its core characteristics?",
@@ -35,7 +38,7 @@ def generate_questions(text):
         "5. In what domains is Python commonly used today?"
     ]
 
-# Generate 5 MCQs with answers
+# Generate 5 MCQs (You can replace with AI later)
 def generate_mcqs(text):
     return [
         {
@@ -74,18 +77,28 @@ if st.button("🚀 Generate Summary, Questions & MCQs"):
     if not raw_text.strip():
         st.warning("Please upload a PDF or paste some text.")
     else:
-        # Generate summary
-        if len(raw_text.split()) < 100:
-            summary = raw_text
-        else:
-            summary = summarizer(raw_text, max_length=500, min_length=200, do_sample=False)[0]['summary_text']
+        st.markdown("## 📝 Summary")
 
+        try:
+            if len(raw_text.split()) < 100:
+                summary = raw_text
+            else:
+                chunks = split_text_into_chunks(raw_text)
+                summaries = []
+                for chunk in chunks:
+                    result = summarizer(chunk, max_length=150, min_length=40, do_sample=False)[0]['summary_text']
+                    summaries.append(result)
+                summary = "\n".join(summaries)
+
+            st.write(summary)
+
+        except Exception as e:
+            st.error("⚠️ Error occurred during summarization.")
+            st.exception(e)
+
+        # Questions and MCQs
         questions = generate_questions(raw_text)
         mcqs = generate_mcqs(raw_text)
-
-        # Output
-        st.markdown("## 📝 Summary")
-        st.write(summary)
 
         st.markdown("## ❓ 5 Important Questions")
         for q in questions:
