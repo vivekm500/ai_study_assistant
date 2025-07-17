@@ -1,5 +1,6 @@
 import streamlit as st
 from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM, MarianMTModel, MarianTokenizer
+import torch
 import PyPDF2
 import speech_recognition as sr
 import tempfile
