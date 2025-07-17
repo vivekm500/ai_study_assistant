@@ -1,5 +1,6 @@
-streamlit==1.35.0
-transformers==4.41.1
-torch==2.3.0
-PyPDF2==3.0.1
-SpeechRecognition==3.10.0
+streamlit
+transformers
+torch
+PyPDF2
+SpeechRecognition
+sentencepiece
