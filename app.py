@@ -1,6 +1,5 @@
 import streamlit as st
 from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM, MarianMTModel, MarianTokenizer
-import torch
 import PyPDF2
 import speech_recognition as sr
 import tempfile
@@ -69,6 +68,12 @@ def export_to_docx(content, filename):
     doc.save(path)
     return path
 
+# Generate output with model
+def generate_with_model(prompt):
+    inputs = tokenizer(prompt, return_tensors="pt", truncation=True)
+    outputs = model.generate(**inputs, max_length=1024, num_beams=4)
+    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+
 # UI Header
 st.title("📚 AI Study Assistant (All-In-One Generator)")
 
@@ -107,64 +112,51 @@ if st.button("🚀 Generate Summary, Questions, MCQs, Flashcards"):
         st.write(summary)
 
         # Important Questions
-        q_prompt = f"""
-Extract all important and meaningful descriptive questions from the text below.
-Avoid duplicates and keep each question well-phrased.
+        question_prompt = f"""
+From the following text, generate 5 important short questions for revision:
 
 Text:
 {chunk}
 """
-        inputs_q = tokenizer(q_prompt, return_tensors="pt", truncation=True)
-        output_q = model.generate(**inputs_q, max_length=1024, num_beams=4)
-        questions = tokenizer.decode(output_q[0], skip_special_tokens=True)
+        questions = generate_with_model(question_prompt)
         questions = translate(questions, lang)
         st.subheader("❓ Important Questions")
         st.text(questions)
 
         # MCQs
         mcq_prompt = f"""
-Generate all possible meaningful multiple-choice questions (MCQs) from the following academic notes.
-Each MCQ must be well-structured, unique, and follow this format:
+From the text below, create 3 multiple-choice questions with 4 options (A to D) and mention the correct answer.
 
-Question: ...
+Format:
+Question:
 Options:
-A. Option A
-B. Option B
-C. Option C
-D. Option D
-Answer: B
-
-Avoid repeating questions or options.
+A.
+B.
+C.
+D.
+Answer:
 
 Text:
 {chunk}
 """
-        inputs_m = tokenizer(mcq_prompt, return_tensors="pt", truncation=True)
-        output_m = model.generate(**inputs_m, max_length=1024, num_beams=4)
-        mcqs = tokenizer.decode(output_m[0], skip_special_tokens=True)
+        mcqs = generate_with_model(mcq_prompt)
         mcqs = translate(mcqs, lang)
         st.subheader("🧠 MCQs")
         st.text(mcqs)
 
         # Flashcards
-        fc_prompt = f"""
-Create as many flashcards as possible from the following text in the format below.
-Each flashcard must be unique and non-repetitive.
-
-Question: ...
-Answer: ...
+        flashcard_prompt = f"""
+Generate 5 flashcards in Q&A format from this text:
 
 Text:
 {chunk}
 """
-        inputs_f = tokenizer(fc_prompt, return_tensors="pt", truncation=True)
-        output_f = model.generate(**inputs_f, max_length=1024, num_beams=4)
-        flashcards = tokenizer.decode(output_f[0], skip_special_tokens=True)
+        flashcards = generate_with_model(flashcard_prompt)
         flashcards = translate(flashcards, lang)
         st.subheader("📇 Flashcards")
         st.text(flashcards)
 
-        # Output combined
+        # Export all
         full_output = f"""📝 Summary:\n{summary}\n\n❓ Important Questions:\n{questions}\n\n🧠 MCQs:\n{mcqs}\n\n📇 Flashcards:\n{flashcards}"""
 
         st.download_button("📥 Export as TXT", full_output, file_name="study_output.txt")
