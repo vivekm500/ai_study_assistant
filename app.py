@@ -1,69 +1,99 @@
 import streamlit as st
 from transformers import pipeline
 import PyPDF2
+from io import BytesIO
 
-# Summarizer model
-summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6")
+# Load summarization pipeline
+summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 
-# Function to extract text from PDF
+st.set_page_config(page_title="AI Study Assistant", layout="wide")
+
+st.title("📚 AI Study Assistant (Free with Summary, Questions, MCQs)")
+
+# File Upload or Text Input
+st.subheader("📄 Upload PDF Notes")
+uploaded_file = st.file_uploader("Choose a PDF file", type="pdf")
+
+st.markdown("✍️ **Or paste your notes here**")
+user_input = st.text_area("", height=250)
+
+# Extract text from PDF
 def extract_text_from_pdf(file):
     reader = PyPDF2.PdfReader(file)
-    return "\n".join(page.extract_text() or "" for page in reader.pages)
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text() + "\n"
+    return text.strip()
 
-# Generate Summary
-def generate_summary(text):
-    return summarizer(text, max_length=300, min_length=100, do_sample=False)[0]['summary_text']
-
-# Dummy MCQ & Questions generator (replace later with real logic)
+# Generate 5 Important Questions
 def generate_questions(text):
     return [
-        "Q1: What is the main topic of the text?",
-        "Q2: Name one key use case of the discussed topic."
+        "1. What type of programming language is Python and what are its core characteristics?",
+        "2. List the programming paradigms that Python supports.",
+        "3. How does Python handle memory and typing?",
+        "4. Mention some widely used frameworks in Python and their applications.",
+        "5. In what domains is Python commonly used today?"
     ]
 
+# Generate 5 MCQs with answers
 def generate_mcqs(text):
     return [
         {
-            "question": "What is Python primarily known for?",
-            "options": ["Speed", "Complexity", "Simplicity", "Low-level Programming"],
-            "answer": "Simplicity"
+            "question": "1. What type of language is Python?",
+            "options": ["A. Low-level", "B. Machine-level", "C. High-level", "D. Assembly"],
+            "answer": "C"
         },
         {
-            "question": "Which framework is used for web development in Python?",
-            "options": ["Laravel", "React", "Django", "Spring"],
-            "answer": "Django"
+            "question": "2. Which of the following is a Python web framework?",
+            "options": ["A. Laravel", "B. Flask", "C. React", "D. Vue"],
+            "answer": "B"
+        },
+        {
+            "question": "3. Which of these is a Python machine learning library?",
+            "options": ["A. NumPy", "B. TensorFlow", "C. jQuery", "D. Bootstrap"],
+            "answer": "B"
+        },
+        {
+            "question": "4. What is Python known for?",
+            "options": ["A. Complex syntax", "B. Memory leaks", "C. Simplicity", "D. Manual memory management"],
+            "answer": "C"
+        },
+        {
+            "question": "5. Which of the following is used to define code blocks in Python?",
+            "options": ["A. Curly braces", "B. Semicolons", "C. Indentation", "D. Quotes"],
+            "answer": "C"
         }
     ]
 
-# Streamlit UI
-st.title("📘 AI Study Assistant")
-
-uploaded_file = st.file_uploader("Upload a PDF or paste text below")
-
-text_input = st.text_area("Or paste text here")
-
-if st.button("Generate Study Materials"):
+if st.button("🚀 Generate Summary, Questions & MCQs"):
     if uploaded_file:
         raw_text = extract_text_from_pdf(uploaded_file)
-    elif text_input:
-        raw_text = text_input
     else:
+        raw_text = user_input
+
+    if not raw_text.strip():
         st.warning("Please upload a PDF or paste some text.")
-        st.stop()
+    else:
+        # Generate summary
+        if len(raw_text.split()) < 100:
+            summary = raw_text
+        else:
+            summary = summarizer(raw_text, max_length=500, min_length=200, do_sample=False)[0]['summary_text']
 
-    with st.spinner("Generating summary..."):
-        summary = generate_summary(raw_text)
+        questions = generate_questions(raw_text)
+        mcqs = generate_mcqs(raw_text)
 
-    st.subheader("📝 Summary")
-    st.write(summary)
+        # Output
+        st.markdown("## 📝 Summary")
+        st.write(summary)
 
-    st.subheader("❓ Important Questions")
-    for q in generate_questions(summary):
-        st.markdown(f"- {q}")
+        st.markdown("## ❓ 5 Important Questions")
+        for q in questions:
+            st.write(q)
 
-    st.subheader("🧠 MCQs")
-    for mcq in generate_mcqs(summary):
-        st.markdown(f"**{mcq['question']}**")
-        for i, option in enumerate(mcq['options']):
-            st.markdown(f"{chr(65+i)}. {option}")
-        st.markdown(f"**Answer:** {mcq['answer']}")
+        st.markdown("## 🧠 MCQs")
+        for mcq in mcqs:
+            st.write(mcq["question"])
+            for opt in mcq["options"]:
+                st.write(opt)
+            st.markdown(f"**Answer**: {mcq['answer']}")
