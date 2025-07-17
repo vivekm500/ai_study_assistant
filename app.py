@@ -8,10 +8,12 @@ import os
 # Title
 st.title("📚 AI Study Assistant (with Voice Input, Summary, Questions & MCQs)")
 
-# Load Hugging Face models
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-base")
-model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-base")
+# ✅ Use CPU-friendly summarization model
+summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6")
+
+# ✅ Use smaller FLAN-T5 model to avoid memory issues on Streamlit Cloud
+tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-small")
+model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-small")
 
 # PDF reading function
 def read_pdf(file):
@@ -52,7 +54,7 @@ elif text_input:
 if st.button("🤖 Generate Summary, Questions & MCQs"):
     if final_text.strip():
         with st.spinner("Generating Detailed Summary..."):
-            input_chunk = final_text[:2048]  # Allow longer text input
+            input_chunk = final_text[:2048]
             summary_parts = summarizer(input_chunk, max_length=300, min_length=80, do_sample=False)
             full_summary = " ".join([part['summary_text'] for part in summary_parts])
             st.subheader("📝 Summary")
