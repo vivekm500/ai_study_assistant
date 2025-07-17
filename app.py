@@ -8,7 +8,7 @@ summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 
 st.set_page_config(page_title="AI Study Assistant", layout="wide")
 
-st.title("📚 AI Study Assistant (Free with Summary, Questions, MCQs)")
+st.title("📚 AI Study Assistant (Generate Summary, Questions, MCQs)")
 
 # File Upload or Text Input
 st.subheader("📄 Upload PDF Notes")
