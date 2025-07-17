@@ -1,8 +1,9 @@
 streamlit
 transformers
-torch
-sentencepiece
 PyPDF2
 SpeechRecognition
 python-docx
 reportlab
+torch
+sentencepiece
+
