@@ -1,9 +1,5 @@
 streamlit
 transformers==4.40.1
-torch==2.1.2
-sentencepiece
+torch
 PyPDF2
-SpeechRecognition
-python-docx
-reportlab
-numpy<2.0
+
